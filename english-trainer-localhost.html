@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<link rel="stylesheet" href="css/styles.css">
+    <title>Тренажёр английского</title>
+</head>
+<body onload="window.scrollTo(0, 0);">
+
+    <div class="container">
+        <h1>🇺🇸 Тренажёр английского</h1>
+        <p>Выбери правильный перевод слова</p>
+
+        <div class="word-container" id="word">Загрузка...</div>
+
+        <div class="options" id="options">
+            <!-- Опции будут генерироваться JS -->
+        </div>
+
+        <div class="score" id="score">Счёт: 0 / 0</div>
+        <div class="result" id="result"></div>
+
+        <button id="nextBtn" disabled>Следующее слово</button>
+        <button class="export-btn" id="exportBtn">Экспорт результатов в TXT</button>
+    </div>
+
+    <div class="footer">Сделано для Вас by Hexxeh777-svg. Без рекламы. Без видео. Только текст и душа.</div>
+
+    <script>
+        let words = [];
+        let currentWord = null;
+        let score = 0;
+        let total = 0;
+        let usedWords = [];
+
+        // Загрузка словаря из файла
+        async function loadWords() {
+            try {
+                const response = await fetch('dictionary/dictionary.js');
+                if (!response.ok) throw new Error(`Ошибка загрузки: ${response.status}`);
+                words = await response.json();
+                showWord();
+            } catch (error) {
+                console.error('Ошибка загрузки словаря:', error);
+                document.getElementById("word").textContent = "Ошибка загрузки словаря";
+            }
+        }
+
+        function getRandomWord() {
+            if (words.length === 0) return null;
+            let available = words.filter(w => !usedWords.includes(w.en));
+            if (available.length === 0) usedWords = [];
+            const word = available[Math.floor(Math.random() * available.length)];
+            usedWords.push(word.en);
+            return word;
+        }
+
+        function generateOptions(correctAnswer) {
+            if (words.length < 4) return [correctAnswer];
+            
+            const options = [correctAnswer];
+            const wrongOptions = words
+                .filter(w => w.ru !== correctAnswer)
+                .map(w => w.ru);
+            
+            for (let i = 0; i < 3 && i < wrongOptions.length; i++) {
+                const randomIndex = Math.floor(Math.random() * wrongOptions.length);
+                options.push(wrongOptions[randomIndex]);
+                wrongOptions.splice(randomIndex, 1);
+            }
+            return options.sort(() => Math.random() - 0.5);
+        }
+
+        function showWord() {
+            if (words.length === 0) {
+                document.getElementById("word").textContent = "Словарь пуст";
+                document.getElementById("nextBtn").disabled = true;
+                return;
+            }
+            
+            currentWord = getRandomWord();
+            if (!currentWord) {
+                document.getElementById("word").textContent = "Слова закончились";
+                document.getElementById("nextBtn").disabled = true;
+                return;
+            }
+            
+            document.getElementById("word").textContent = currentWord.en;
+
+            const options = generateOptions(currentWord.ru);
+            const optionsContainer = document.getElementById("options");
+            optionsContainer.innerHTML = '';
+
+            options.forEach(option => {
+                const btn = document.createElement("button");
+                btn.textContent = option;
+                btn.onclick = () => checkAnswer(option);
+                optionsContainer.appendChild(btn);
+            });
+
+            document.getElementById("nextBtn").disabled = false;
+            document.getElementById("result").textContent = "";
+        }
+
+        function checkAnswer(selected) {
+            if (!currentWord) return; // Добавлена проверка
+            
+            const isCorrect = selected === currentWord.ru;
+            const resultEl = document.getElementById("result");
+            const buttons = document.querySelectorAll("#options button");
+
+            total++;
+            if (isCorrect) {
+                score++;
+                resultEl.textContent = "✅ Правильно!";
+                resultEl.style.color = "#a0d8f1";
+                buttons.forEach(btn => {
+                    if (btn.textContent === selected) btn.classList.add("correct");
+                    else btn.disabled = true;
+                });
+            } else {
+                resultEl.textContent = `❌ Неверно. Правильно: ${currentWord.ru}`;
+                resultEl.style.color = "#ff8a8a";
+                buttons.forEach(btn => {
+                    if (btn.textContent === currentWord.ru) btn.classList.add("correct");
+                    else if (btn.textContent === selected) btn.classList.add("wrong");
+                    btn.disabled = true;
+                });
+            }
+
+            document.getElementById("score").textContent = `Счёт: ${score} / ${total}`;
+        }
+
+        document.getElementById("nextBtn").addEventListener("click", showWord);
+        document.getElementById("exportBtn").addEventListener("click", () => {
+            const text = `Тренажёр английского — результаты Den\n\nВсего слов: ${total}\nПравильно: ${score}\nОшибок: ${total - score}\nУспешность: ${Math.round((score / total) * 100)}%\n\nДата: ${new Date().toLocaleString('ru-RU')}`;
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'english-trainer-results.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+
+        // Загрузка словаря при старте
+        loadWords();
+    </script>
+
+</body>
+</html>
